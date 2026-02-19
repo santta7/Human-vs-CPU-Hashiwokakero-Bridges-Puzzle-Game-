@@ -228,7 +228,8 @@ public class BridgesAdvanced1 extends JPanel
     // ═════════════════════════════════════════════════════════
     //  GEOMETRY / VALIDATION HELPERS
     // ═════════════════════════════════════════════════════════
-
+    //Implemented canConnect() for validating bridge connections
+    //Added canConnect() function for geometric validation of bridges (no crossing, no intermediate islands)
     private boolean canConnect(Island a, Island b, List<Bridge> extra) {
         // Check alignment (same row/column)
         if (a == b || (a.x != b.x && a.y != b.y)) return false;
@@ -602,6 +603,7 @@ public class BridgesAdvanced1 extends JPanel
     * Adds a bridge between two islands for the CPU (AI move).
     * The AI places only ONE bridge segment per turn.
     */
+    //Implemented addBridgeForAI() to handle CPU bridge placement
     private void addBridgeForCPU(Island a, Island b) {
         // Validate connection
         if (!canConnect(a, b, new ArrayList<>())) return;
