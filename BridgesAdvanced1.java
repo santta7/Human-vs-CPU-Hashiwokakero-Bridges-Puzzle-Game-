@@ -386,7 +386,7 @@ public class BridgesAdvanced1 extends JPanel
         return merged;
     }
 
-     /**
+    /**
      * Validates whether an edge (a, b) is currently playable.
      *
      *Checks performed:
