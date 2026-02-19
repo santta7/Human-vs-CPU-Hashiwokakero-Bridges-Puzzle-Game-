@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import java.util.Queue;
 
 /**
  * BridgesAdvanced.java  –  Hashiwokakero (Bridges Puzzle) — Human vs. AI
@@ -229,13 +230,18 @@ public class BridgesAdvanced1 extends JPanel
     // ═════════════════════════════════════════════════════════
 
     private boolean canConnect(Island a, Island b, List<Bridge> extra) {
+        // Check alignment (same row/column)
         if (a == b || (a.x != b.x && a.y != b.y)) return false;
+        // Check crossing with extra bridges
         for (Bridge br : extra)   if (bridgesCross(a, b, br.a, br.b)) return false;
+        // Check crossing with existing bridges
         for (Bridge br : bridges) if (bridgesCross(a, b, br.a, br.b)) return false;
+        // Check if any island is in between
         for (Island c : islands) {
             if (c == a || c == b) continue;
             if (islandBetween(a, b, c)) return false;
         }
+        // Valid connection
         return true;
     }
 
@@ -380,33 +386,77 @@ public class BridgesAdvanced1 extends JPanel
         return merged;
     }
 
-    /**
-     * Checks whether placing a bridge between a and b is currently legal:
-     * - Both islands still have remaining capacity.
-     * - No existing double-bridge already fills the slot.
-     * - Geometric constraints are satisfied (no crossing, no island in-between).
+     /**
+     * Validates whether an edge (a, b) is currently playable.
+     *
+     *Checks performed:
+     * 1. Endpoints must be different.
+     * 2. Both islands must still have remaining degree capacity.
+     * 3. Existing bridge must not already be at MAX_BRIDGES.
+     * 4. Geometric constraints must be satisfied (no crossing, no island blocking).
+     *
+     * This method acts as a safety filter before the move is scored by DP.
      */
     private boolean isLegalMove(Island a, Island b) {
-        // # COMMAND 1: Check if both islands still have remaining capacity
-        if (getBridgeCount(a) >= a.required) return false;
-        if (getBridgeCount(b) >= b.required) return false;
-        // # COMMAND 2: Ensure no more than MAX_BRIDGES (2) between same islands
-        Bridge ex = findBridge(a, b);
-        if (ex != null && ex.count >= MAX_BRIDGES) return false;
-        // # COMMAND 3: Validate geometric constraints
-        // (alignment, no crossing, no island in between)
-        return canConnect(a, b, new ArrayList<>());
+
+        //Null safety check
+        if (a == null || b == null) return false;
+
+        //Prevent self-loop
+        if (a == b) return false;
+
+        //Remaining capacity check
+        int remainA = a.required - getBridgeCount(a);
+        int remainB = b.required - getBridgeCount(b);
+
+        if (remainA <= 0 || remainB <= 0) return false;
+
+        //Existing bridge capacity check
+        Bridge existing = findBridge(a, b);
+        if (existing != null && existing.count >= MAX_BRIDGES)
+            return false;
+
+         //Geometric validity (no crossing, no intermediate island)
+        if (!canConnect(a, b, new ArrayList<>()))
+            return false;
+
+        //Final confirmation – move is valid
+        return true;
     }
 
     /**
-     * Constraint-Density score for a candidate edge — delegates to DP look-ahead.
-     * Lower score = higher priority for the AI.
+     * Computes the priority score of edge (a, b).
+     *
+     * This function integrates Dynamic Programming look-ahead
+     * to evaluate how beneficial adding ONE segment would be.
+     *
+     * Lower score → endpoints become closer to satisfaction.
+     * Higher priority → AI prefers this move.
      */
-    // # COMMAND : Use DP look-ahead to evaluate edge priority
     private int constraintDensityScore(Island a, Island b) {
-        return dpEdgePriority(a, b);
-    }
 
+        // Defensive check (should never happen if called correctly)
+        if (!isLegalMove(a, b))
+            return Integer.MAX_VALUE;
+
+        // Remaining slack at endpoints BEFORE placing the bridge
+        int remainA = a.required - getBridgeCount(a);
+        int remainB = b.required - getBridgeCount(b);
+
+        int baselineSlack = remainA + remainB;
+
+        // DP-based projected slack AFTER one more segment
+        int dpScore = dpEdgePriority(a, b);
+
+        // Optional heuristic adjustment:
+        // Slightly prefer edges that connect tighter islands
+        int tightnessBonus = Math.min(remainA, remainB);
+
+        // Final composite score (lower is better)
+        int finalScore = dpScore + tightnessBonus;
+
+        return finalScore;
+    }
     /**
      * Standard merge of two sorted Move lists (by score ascending).
      * Also handles the case where one or both lists are unsorted
@@ -548,32 +598,39 @@ public class BridgesAdvanced1 extends JPanel
     // ═════════════════════════════════════════════════════════
     //  MOVE APPLICATION
     // ═════════════════════════════════════════════════════════
-
+    /**
+    * Adds a bridge between two islands for the CPU (AI move).
+    * The AI places only ONE bridge segment per turn.
+    */
     private void addBridgeForCPU(Island a, Island b) {
+        // Validate connection
         if (!canConnect(a, b, new ArrayList<>())) return;
-
+        // Store previous counts
         int prevA = getBridgeCount(a), prevB = getBridgeCount(b);
 
         // The AI always places exactly ONE segment per turn — same as the human.
         // DP (dpEdgePriority) already influenced WHICH edge was chosen; it does
         // not control HOW MANY segments are placed in a single turn.
+        // Find existing bridge
         Bridge ex = findBridge(a, b);
         if (ex == null) {
+            // Create new bridge
             Bridge nb = new Bridge(a, b, 1);
             nb.owner = 2;
             bridges.add(nb);
         } else if (ex.count < MAX_BRIDGES) {
+            // Increase bridge count
             ex.count++;
             ex.owner = 2;
         }
 
-        // Invalidate DP cache for this pair (state has changed)
+        // Remove DP cache entry
         int ia = islands.indexOf(a), ib = islands.indexOf(b);
         dpCache.remove(Math.min(ia,ib) + "-" + Math.max(ia,ib));
-
+        // Update scores
         if (prevA < a.required && getBridgeCount(a) == a.required) computerScore++;
         if (prevB < b.required && getBridgeCount(b) == b.required) computerScore++;
-
+        // Refresh UI and check completion
         repaint();
         if (isSolved()) showSolvedPopup();
     }
