@@ -5,10 +5,29 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * Hashiwokakero (Bridges Puzzle) - Human vs. CPU.
- *
- * CPU move selection is implemented with depth-limited backtracking.
- */
+# Bridges Puzzle Game - Hashiwokakero Solver
+# ===============================================================
+# An interactive GUI-based puzzle game with human vs. CPU gameplay
+# 
+# Game Rules:
+#   - Connect islands with bridges based on required connection counts
+#   - Max 2 bridges between any two adjacent islands
+#   - All islands must connect to form a single connected group
+#
+# Features:
+#   - Interactive Swing GUI with mouse controls
+#   - CPU AI using depth-limited backtracking algorithm
+#   - Difficulty levels: Easy, Medium, Hard
+#   - Move history with undo/redo functionality
+#   - Real-time game state validation
+#   - Score tracking for both human and computer players
+#
+# Algorithm:
+#   - CPU move selection uses constraint-density scoring heuristic
+#   - Backtracking search with depth limiting for performance
+#   - Island requirement constraints guide move evaluation
+#
+**/
 public class Bridges_backtracking extends JPanel
         implements MouseListener, MouseMotionListener, KeyListener {
 
@@ -721,6 +740,7 @@ public class Bridges_backtracking extends JPanel
         });
     }
 }
+
 
 
 
