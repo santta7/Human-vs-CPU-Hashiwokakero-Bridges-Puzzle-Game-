@@ -1,3 +1,4 @@
+package project;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
@@ -5,29 +6,10 @@ import java.util.List;
 import javax.swing.*;
 
 /**
-# Bridges Puzzle Game - Hashiwokakero Solver
-# ===============================================================
-# An interactive GUI-based puzzle game with human vs. CPU gameplay
-# 
-# Game Rules:
-#   - Connect islands with bridges based on required connection counts
-#   - Max 2 bridges between any two adjacent islands
-#   - All islands must connect to form a single connected group
-#
-# Features:
-#   - Interactive Swing GUI with mouse controls
-#   - CPU AI using depth-limited backtracking algorithm
-#   - Difficulty levels: Easy, Medium, Hard
-#   - Move history with undo/redo functionality
-#   - Real-time game state validation
-#   - Score tracking for both human and computer players
-#
-# Algorithm:
-#   - CPU move selection uses constraint-density scoring heuristic
-#   - Backtracking search with depth limiting for performance
-#   - Island requirement constraints guide move evaluation
-#
-**/
+ * Hashiwokakero (Bridges Puzzle) - Human vs. CPU.
+ *
+ * CPU move selection is implemented with depth-limited backtracking.
+ */
 public class Bridges_backtracking extends JPanel
         implements MouseListener, MouseMotionListener, KeyListener {
 
@@ -227,6 +209,8 @@ public class Bridges_backtracking extends JPanel
         JOptionPane.showMessageDialog(this, "Solution shown.", "Solve",
                 JOptionPane.INFORMATION_MESSAGE);
     }
+
+    
 
     // =====================================================
     //  UNDO FUNCTIONALITY
@@ -483,6 +467,27 @@ public class Bridges_backtracking extends JPanel
         if (best != null) addBridgeForCPU(best.a, best.b);
     }
 
+    public void showBacktrackingDemo() {
+        if (isSolved()) {
+            JOptionPane.showMessageDialog(this,
+                    "Puzzle is already solved!", "Backtracking Demo",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int depth = getBacktrackingDepth();
+        Move bestMove = chooseMoveByBacktracking(depth);
+        if (bestMove != null) {
+            String msg = String.format("Backtracking Algorithm Decision:\nIsland A: (%d, %d)\nIsland B: (%d, %d)\nSearch Depth: %d",
+                    bestMove.a.x, bestMove.a.y, bestMove.b.x, bestMove.b.y, depth);
+            JOptionPane.showMessageDialog(this, msg, "Backtracking Demo", JOptionPane.INFORMATION_MESSAGE);
+            addBridgeForCPU(bestMove.a, bestMove.b);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                    "No valid move found by Backtracking.", "Backtracking Demo",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
     private void addBridgeForCPU(Island a, Island b) {
         if (!canConnect(a, b, new ArrayList<>())) return;
 
@@ -712,9 +717,10 @@ public class Bridges_backtracking extends JPanel
             JButton restartBtn = new JButton("Restart");
             JButton solveBtn   = new JButton("Solve");
             JButton undoBtn    = new JButton("Undo (Ctrl+Z)");
+            JButton backtrackBtn = new JButton("Backtracking");
 
             topBar.add(new JLabel("Difficulty:")); topBar.add(typeBox);
-            topBar.add(newBtn); topBar.add(restartBtn); topBar.add(solveBtn); topBar.add(undoBtn);
+            topBar.add(newBtn); topBar.add(restartBtn); topBar.add(solveBtn); topBar.add(undoBtn); topBar.add(backtrackBtn);
 
             typeBox.addActionListener(e -> {
                 String sel = (String) typeBox.getSelectedItem();
@@ -727,6 +733,10 @@ public class Bridges_backtracking extends JPanel
             restartBtn.addActionListener(e -> { gamePanel.restartPuzzle();   gamePanel.requestFocusInWindow(); });
             solveBtn  .addActionListener(e -> { gamePanel.showSolution();    gamePanel.requestFocusInWindow(); });
             undoBtn   .addActionListener(e -> { gamePanel.undoLastMove();    gamePanel.requestFocusInWindow(); });
+            backtrackBtn.addActionListener(e -> {
+                gamePanel.showBacktrackingDemo();
+                gamePanel.requestFocusInWindow();
+            });
 
             JPanel container = new JPanel(new BorderLayout());
             container.add(topBar,    BorderLayout.NORTH);
@@ -740,6 +750,8 @@ public class Bridges_backtracking extends JPanel
         });
     }
 }
+
+
 
 
 
