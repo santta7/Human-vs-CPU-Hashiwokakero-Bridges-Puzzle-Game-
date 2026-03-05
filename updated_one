@@ -1,0 +1,410 @@
+package project;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import java.util.List;
+import java.util.Queue;
+    // ═════════════════════════════════════════════════════════
+    //  GEOMETRY / VALIDATION HELPERS
+    // ═════════════════════════════════════════════════════════
+    //Implemented canConnect() for validating bridge connections
+    //Added canConnect() function for geometric validation of bridges (no crossing, no intermediate islands)
+public class BridgesAdvanced1 extends JPanel
+        implements MouseListener, MouseMotionListener, KeyListener {
+
+    // ─────────────────────── CONSTANTS ───────────────────────
+    private static final int CELL_SIZE     = 60;
+    private static final int ISLAND_RADIUS = 20;
+    private static final int GRID_W        = 7;
+    private static final int GRID_H        = 7;
+    private static final int MAX_BRIDGES   = 2;
+
+    private static final Color BG_COLOR           = new Color(240, 240, 240);
+    private static final Color ISLAND_COLOR        = new Color(255, 255, 200);
+    private static final Color ISLAND_DONE_COLOR   = new Color(180, 255, 180);
+    private static final Color ERROR_COLOR         = new Color(255, 120, 120);
+    private static final Color TEXT_COLOR          = Color.BLACK;
+    private static final Color HUMAN_BRIDGE_COLOR  = Color.BLUE;
+    private static final Color CPU_BRIDGE_COLOR     = Color.RED;
+    private static final Color BRIDGE_COLOR        = new Color(60, 60, 60);
+
+    public enum Difficulty { EASY, MEDIUM, HARD }
+    private Difficulty difficulty = Difficulty.MEDIUM;
+
+    private enum Player { HUMAN, CPU }
+    private Player currentPlayer = Player.HUMAN;
+
+    // ─────────────────────── GAME STATE ──────────────────────
+    private final List<Island> islands        = new ArrayList<>();
+    private final List<Bridge> bridges        = new ArrayList<>();
+    private final List<Bridge> solutionBridges = new ArrayList<>();
+
+    private Island dragStart = null;
+    private Point  mousePos  = null;
+
+    private boolean cpuThinking    = false;
+    private int     humanScore    = 0;
+    private int     computerScore = 0;
+
+    // DP cache: keyed by "idxA-idxB", value = optimal bridge count chosen
+    private final Map<String, Integer> dpCache = new HashMap<>();
+    public BridgesAdvanced1() {
+        setPreferredSize(new Dimension(GRID_W * CELL_SIZE, GRID_H * CELL_SIZE + 30));
+        setBackground(BG_COLOR);
+        addMouseListener(this);
+        addMouseMotionListener(this);
+        addKeyListener(this);
+        setFocusable(true);
+        generatePuzzle();
+    }
+
+    public void setDifficulty(Difficulty d) { this.difficulty = d; generatePuzzle(); }
+    private boolean canConnect(Island a, Island b, List<Bridge> extra) {
+        // Check alignment (same row/column)
+        if (a == b || (a.x != b.x && a.y != b.y)) return false;
+        // Check crossing with extra bridges
+        for (Bridge br : extra)   if (bridgesCross(a, b, br.a, br.b)) return false;
+        // Check crossing with existing bridges
+        for (Bridge br : bridges) if (bridgesCross(a, b, br.a, br.b)) return false;
+        // Check if any island is in between
+        for (Island c : islands) {
+            if (c == a || c == b) continue;
+            if (islandBetween(a, b, c)) return false;
+        }
+        // Valid connection
+        return true;
+    }
+
+    private boolean islandBetween(Island a, Island b, Island c) {
+        if (a.x == b.x && c.x == a.x) {
+            int lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y);
+            return c.y > lo && c.y < hi;
+        }
+        if (a.y == b.y && c.y == a.y) {
+            int lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
+            return c.x > lo && c.x < hi;
+        }
+        return false;
+    }
+
+    private boolean bridgesCross(Island a1, Island b1, Island a2, Island b2) {
+        boolean h1 = (a1.y == b1.y), h2 = (a2.y == b2.y);
+        if (h1 == h2) return false;
+        Island h, hE, v, vE;
+        if (h1) { h=a1; hE=b1; v=a2; vE=b2; } else { h=a2; hE=b2; v=a1; vE=b1; }
+        int hLo = Math.min(h.x, hE.x), hHi = Math.max(h.x, hE.x);
+        int vLo = Math.min(v.y, vE.y), vHi = Math.max(v.y, vE.y);
+        return v.x > hLo && v.x < hHi && h.y > vLo && h.y < vHi;
+    }
+
+    private Bridge findBridge(Island a, Island b, List<Bridge> list) {
+        for (Bridge br : list) if (br.connects(a, b)) return br;
+        return null;
+    }
+    private Bridge findBridge(Island a, Island b) { return findBridge(a, b, bridges); }
+
+    private int getBridgeCount(Island isl) {
+        int s = 0;
+        for (Bridge br : bridges) if (br.a == isl || br.b == isl) s += br.count;
+        return s;
+    }
+  // ═════════════════════════════════════════════════════════
+    //  MOVE APPLICATION
+    // ═════════════════════════════════════════════════════════
+    /**
+    * Adds a bridge between two islands for the CPU (AI move).
+    * The AI places only ONE bridge segment per turn.
+    */
+    //Implemented addBridgeForAI() to handle CPU bridge placement
+    private void addBridgeForCPU(Island a, Island b) {
+        // Validate connection
+        if (!canConnect(a, b, new ArrayList<>())) return;
+        // Store previous counts
+        int prevA = getBridgeCount(a), prevB = getBridgeCount(b);
+
+        // The AI always places exactly ONE segment per turn — same as the human.
+        // DP (dpEdgePriority) already influenced WHICH edge was chosen; it does
+        // not control HOW MANY segments are placed in a single turn.
+        // Find existing bridge
+        Bridge ex = findBridge(a, b);
+        if (ex == null) {
+            // Create new bridge
+            Bridge nb = new Bridge(a, b, 1);
+            nb.owner = 2;
+            bridges.add(nb);
+        } else if (ex.count < MAX_BRIDGES) {
+            // Increase bridge count
+            ex.count++;
+            ex.owner = 2;
+        }
+
+        // Remove DP cache entry
+        int ia = islands.indexOf(a), ib = islands.indexOf(b);
+        dpCache.remove(Math.min(ia,ib) + "-" + Math.max(ia,ib));
+        // Update scores
+        if (prevA < a.required && getBridgeCount(a) == a.required) computerScore++;
+        if (prevB < b.required && getBridgeCount(b) == b.required) computerScore++;
+        // Refresh UI and check completion
+        repaint();
+        if (isSolved()) showSolvedPopup();
+    }
+
+    private int addOrRemoveBridgeHuman(Island a, Island b) {
+        if (!canConnect(a, b, new ArrayList<>())) return 0;
+        int prevA = getBridgeCount(a), prevB = getBridgeCount(b);
+        Bridge ex = findBridge(a, b);
+        int delta;
+
+        // Invalidate DP cache (board state changes)
+        int ia = islands.indexOf(a), ib = islands.indexOf(b);
+        dpCache.remove(Math.min(ia,ib) + "-" + Math.max(ia,ib));
+
+        if (ex == null) {
+            Bridge nb = new Bridge(a, b, 1); nb.owner = 1; bridges.add(nb); delta = 1;
+        } else if (ex.count < MAX_BRIDGES) {
+            ex.count++; ex.owner = 1; delta = 1;
+        } else {
+            bridges.remove(ex); delta = -1;
+        }
+
+        if (prevA < a.required && getBridgeCount(a) == a.required) humanScore++;
+        if (prevB < b.required && getBridgeCount(b) == b.required) humanScore++;
+
+        repaint();
+        if (isSolved()) showSolvedPopup();
+        return delta;
+    }
+
+    private void showSolvedPopup() {
+        String winner;
+        if      (humanScore > computerScore) winner = "Human wins!";
+        else if (computerScore > humanScore) winner = "Computer wins!";
+        else                                 winner = "It's a draw!";
+
+        JOptionPane.showMessageDialog(this,
+                "Puzzle solved!\n\nHuman: " + humanScore +
+                " pts\nComputer: " + computerScore + " pts\n\n" + winner,
+                "Solved", JOptionPane.INFORMATION_MESSAGE);
+    }
+        }
+}
+// =====================================================
+// BACKTRACKING SOLVER
+// =====================================================
+
+// Cache to avoid recomputing states
+private final Set<String> btCache = new HashSet<>();
+private int btCalls = 0;
+
+
+// Entry function
+public void solvePuzzleByBacktracking() {
+
+    btCache.clear();
+    btCalls = 0;
+
+    List<Bridge> start = deepCopyBridges(bridges);
+
+    List<Bridge> result = btSolve(start,0);
+
+    if(result != null)
+    {
+        bridges.clear();
+        bridges.addAll(result);
+        repaint();
+
+        JOptionPane.showMessageDialog(this,
+                "Solution found using Backtracking\nCalls: " + btCalls);
+    }
+    else
+    {
+        JOptionPane.showMessageDialog(this,
+                "No solution found");
+    }
+}
+
+
+// Main recursive solver
+private List<Bridge> btSolve(List<Bridge> current, int depth)
+{
+    btCalls++;
+
+    if(btIsSolved(current))
+        return current;
+
+    if(!btIsValid(current))
+        return null;
+
+    if(depth > 60)
+        return null;
+
+    String key = btStateKey(current);
+
+    if(btCache.contains(key))
+        return null;
+
+    List<int[]> moves = btMoves(current);
+
+    for(int[] mv : moves)
+    {
+        Island a = islands.get(mv[0]);
+        Island b = islands.get(mv[1]);
+
+        List<Bridge> next = deepCopyBridges(current);
+
+        Bridge ex = btFindBridge(a,b,next);
+
+        if(ex == null)
+            next.add(new Bridge(a,b,1));
+        else if(ex.count < MAX_BRIDGES)
+            ex.count++;
+        else
+            continue;
+
+        List<Bridge> result = btSolve(next,depth+1);
+
+        if(result != null)
+            return result;
+    }
+
+    btCache.add(key);
+    return null;
+}
+
+
+// =====================================================
+// BACKTRACKING HELPERS
+// =====================================================
+
+private boolean btIsSolved(List<Bridge> bl)
+{
+    for(Island isl : islands)
+    {
+        int deg = 0;
+
+        for(Bridge b : bl)
+            if(b.a==isl || b.b==isl)
+                deg += b.count;
+
+        if(deg != isl.required)
+            return false;
+    }
+
+    return true;
+}
+
+
+private boolean btIsValid(List<Bridge> bl)
+{
+    for(Island isl : islands)
+    {
+        int deg = 0;
+
+        for(Bridge b : bl)
+            if(b.a==isl || b.b==isl)
+                deg += b.count;
+
+        if(deg > isl.required)
+            return false;
+    }
+
+    return true;
+}
+
+
+private List<int[]> btMoves(List<Bridge> bl)
+{
+    List<int[]> moves = new ArrayList<>();
+
+    for(int i=0;i<islands.size();i++)
+    {
+        Island a = islands.get(i);
+
+        int degA = 0;
+
+        for(Bridge b:bl)
+            if(b.a==a || b.b==a)
+                degA += b.count;
+
+        if(degA >= a.required)
+            continue;
+
+        for(int j=i+1;j<islands.size();j++)
+        {
+            Island b = islands.get(j);
+
+            int degB = 0;
+
+            for(Bridge br:bl)
+                if(br.a==b || br.b==b)
+                    degB += br.count;
+
+            if(degB >= b.required)
+                continue;
+
+            Bridge ex = btFindBridge(a,b,bl);
+
+            if(ex != null && ex.count >= MAX_BRIDGES)
+                continue;
+
+            if(!canConnect(a,b,new ArrayList<>()))
+                continue;
+
+            moves.add(new int[]{i,j});
+        }
+    }
+
+    return moves;
+}
+
+
+private Bridge btFindBridge(Island a, Island b, List<Bridge> bl)
+{
+    for(Bridge br : bl)
+        if(br.connects(a,b))
+            return br;
+
+    return null;
+}
+
+
+private List<Bridge> deepCopyBridges(List<Bridge> src)
+{
+    List<Bridge> copy = new ArrayList<>();
+
+    for(Bridge b : src)
+    {
+        Bridge c = new Bridge(b.a,b.b,b.count);
+        c.owner = b.owner;
+        copy.add(c);
+    }
+
+    return copy;
+}
+
+
+private String btStateKey(List<Bridge> bl)
+{
+    List<String> parts = new ArrayList<>();
+
+    for(Bridge b : bl)
+    {
+        String ea = b.a.x + "," + b.a.y;
+        String eb = b.b.x + "," + b.b.y;
+
+        String part;
+
+        if(ea.compareTo(eb) <= 0)
+            part = ea+"-"+eb+":"+b.count;
+        else
+            part = eb+"-"+ea+":"+b.count;
+
+        parts.add(part);
+    }
+
+    Collections.sort(parts);
+
+    return String.join(";",parts);
+}
