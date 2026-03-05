@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project implements a **Human vs CPU Hashiwokakero (Bridges) Puzzle Game** using a **Depth-First Search (DFS) with Backtracking** algorithm for AI-driven puzzle solving. Hashiwokakero is a logic puzzle where the goal is to connect islands with bridges following specific constraints.
+This project implements a **Human vs CPU Hashiwokakero (Bridges) Puzzle Game** using a **Depth-First Search (DFS) with Backtracking** algorithm for CPU-driven puzzle solving. Hashiwokakero is a logic puzzle where the goal is to connect islands with bridges following specific constraints.
 
 ### Puzzle Rules
 - Islands require a specific number of connections (bridges)
@@ -299,28 +299,11 @@ Unlike greedy (incomplete), divide-and-conquer (non-independent subproblems), or
 
 ---
 
-## How to Run
-
-### Solve the Puzzle via Backtracking
-1. Click **"Solve (Backtracking)"** button
-2. Watch the step-by-step visualization with:
-   - Depth indicator
-   - Recursive call count
-   - Time elapsed
-3. Adjust animation speed with the slider
-
-### Keyboard Controls
-- **Arrow keys**: Quick move/remove bridges
-- **Undo**: Revert last move
-- **Ctrl+N**: New puzzle
-- **Ctrl+D**: Change difficulty
-
----
 
 ## References
 
 - Hashiwokakero constraints analysis
 - Depth-First Search with Backtracking (DFS)
-- Constraint Satisfaction Problem (CSP) techniques
 - Heuristic search and move ordering
+
 
