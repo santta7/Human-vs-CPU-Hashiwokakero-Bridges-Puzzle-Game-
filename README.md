@@ -160,7 +160,7 @@ Where:
 - **b** (branching factor) = $O(n^2)$ (possible moves)
 - **d** (depth) = $O(n^2)$ (maximum bridges)
 
-$$T(n) = O((n^2)^{n^2} \cdot n^2) = O(n^{2n^2 + 2})$$
+$$T(n) = O((n^2)^{n^2} \cdot n^2) = O(n^{2n^2 + 2})$$ = O(n^2)$$
 
 ### Practical Complexity (With Optimizations)
 
@@ -305,5 +305,6 @@ Unlike greedy (incomplete), divide-and-conquer (non-independent subproblems), or
 - Hashiwokakero constraints analysis
 - Depth-First Search with Backtracking (DFS)
 - Heuristic search and move ordering
+
 
 
